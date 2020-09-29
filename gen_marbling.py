@@ -62,12 +62,12 @@ def dropCircle(img, color, dpCoord, r):
                     Q = tuple(np.uint8(origCoordArray))
                     img[P] = buf[Q]
                 except Exception as e:
-                    print e
+                    print (e)
                     sys.exit(1)
 
     # cv2.circle method specifies the dropping point reverse the order (y, x)
     # instead of (x, y)
-    cv2.circle(img, (dpCoord[1], dpCoord[0]), r, color, -1)
+    cv2.circle(img, (dpCoord[1], dpCoord[0]), r, color.tolist(), -1, lineType=cv2.LINE_AA)
 
 if __name__=='__main__':
     img = np.full((args.WIDTH, args.HEIGHT, 3), 255, dtype=np.uint8)
