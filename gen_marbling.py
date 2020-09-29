@@ -98,7 +98,6 @@ def dropCircle(img, color, dpCoord, r):
 def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 10):
     # keep buf unchaged for reference
     buf = img.copy()
-    distortCount = 0
     for i, row in enumerate(buf):
         for j, col in enumerate(row):
             # setup variables
@@ -127,18 +126,14 @@ def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 10)
             # the originated point, thought of as warped into the current position, may sometimes become out the bound
             # of the pallet. So we need work-around to fill the gap of `no point to be warped from`.
             # Specular reflection (鏡面反射) method
-            if origCoordArray[0] > args.WIDTH:
+            if origCoordArray[0] > args.WIDTH - 1:
                 origCoordArray[0] = args.WIDTH - 1
-                distortCount += 1
             elif origCoordArray[0] < 0:
                 origCoordArray[0] = 0
-                distortCount += 1
-            if origCoordArray[1] > args.HEIGHT:
+            if origCoordArray[1] > args.HEIGHT - 1:
                 origCoordArray[1] = args.HEIGHT - 1
-                distortCount += 1
             elif origCoordArray[1] < 0:
                 origCoordArray[1] = 0
-                distortCount += 1
 
             try:
                 Q = tuple(np.uint8(origCoordArray))
