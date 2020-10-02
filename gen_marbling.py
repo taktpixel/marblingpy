@@ -1,5 +1,22 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
+#
+# marblingpy: a program that generates a randomized mathematical marbling image.
+# Copyright (c) 2020 Taktpixel Co.,Ltd.
+# Contact: contact@taktpixel.co.jp
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 __author__ = "Shinobu Yokoyama <cohomolg@gmail.com>"
 __date__ = "2020/10/01 21:06:31"
@@ -20,7 +37,7 @@ parser.add_argument('--save', dest='FILE', type=str, help='write generating imag
 parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function to apply the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
 parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
 parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
-parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=10)
+parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
 args = parser.parse_args()
 elementType = np.uint16
 
