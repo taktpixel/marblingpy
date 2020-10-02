@@ -2,7 +2,7 @@
 #-*- coding:utf-8 -*-
 
 __author__ = "Shinobu Yokoyama <cohomolg@gmail.com>"
-__date__ = "2020/09/29 04:16:11"
+__date__ = "2020/10/01 21:06:31"
 __version__ = "$1.0$"
 __file__="GEN_MARBLING_PY"
 __credits__ = ""
@@ -15,11 +15,14 @@ import math
 import argparse
 
 parser = argparse.ArgumentParser(description='generate a randomized mathematical marbling image.')
+parser.add_argument('--init', dest='INIT', type=str, help='if given, the distortion will start based from the image (png) file', metavar='INIT')
 parser.add_argument('--save', dest='FILE', type=str, help='write generating image to FILE', metavar='FILE', default=datetime.now().strftime('%y%m%d%H%M%S.%f')[:-3] + '.png')
-parser.add_argument('--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
-parser.add_argument('--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
+parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function to apply the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
+parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
+parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
 parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=10)
 args = parser.parse_args()
+elementType = np.uint16
 
 #
 # test functions
@@ -36,11 +39,14 @@ def testGetRandomIntDivision(n, div, divList = []):
 
 def testDropCircle(img, count = 10):
     for i in range(count):
-        color = np.random.randint(0, 255, 3)
+        color1 = np.random.randint(0, 256)
+        color2 = np.random.randint(0, 256)
+        color3 = np.random.randint(0, 256)
         x = np.random.randint(0, args.WIDTH)
         y = np.random.randint(0, args.HEIGHT)
         r = np.random.randint(10, np.min((100, np.max((10, int(np.min((args.WIDTH, args.HEIGHT))/2))))))
-        dropCircle(img, color, (x, y), r)
+
+        dropCircle(img, (color1, color2, color3), (x, y), r)
 
 def testDrawTineLine(img, count = 2):
     for i in range(count):
@@ -78,9 +84,8 @@ def dropCircle(img, color, dpCoord, r):
                 continue
             else:
                 origCoordArray = dpCoordArray + derivCoordArray * math.sqrt(1 - r**2 / d**2)
-
                 try:
-                    Q = tuple(np.uint8(origCoordArray))
+                    Q = tuple(elementType(origCoordArray))
                     img[P] = buf[Q]
                 except Exception as e:
                     print (e)
@@ -95,7 +100,7 @@ def dropCircle(img, color, dpCoord, r):
 
     cv2.circle(img, (dpCoord[1], dpCoord[0]), r, _color, -1, lineType=cv2.LINE_AA)
 
-def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 10):
+def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
     # keep buf unchaged for reference
     buf = img.copy()
     for i, row in enumerate(buf):
@@ -125,7 +130,7 @@ def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 10)
 
             # the originated point, thought of as warped into the current position, may sometimes become out the bound
             # of the pallet. So we need work-around to fill the gap of `no point to be warped from`.
-            # Specular reflection (鏡面反射) method
+            # Specular reflection method
             if origCoordArray[0] > args.WIDTH - 1:
                 origCoordArray[0] = args.WIDTH - 1
             elif origCoordArray[0] < 0:
@@ -136,14 +141,23 @@ def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 10)
                 origCoordArray[1] = 0
 
             try:
-                Q = tuple(np.uint8(origCoordArray))
+                Q = tuple(elementType(origCoordArray))
                 img[P] = buf[Q]
             except Exception as e:
                 print (e)
                 sys.exit(1)
 
 if __name__=='__main__':
-    img = np.full((args.WIDTH, args.HEIGHT, 3), 255, dtype=np.uint8)
-    testDropCircle(img, 10)
-    testDrawTineLine(img, 2)
-    cv2.imwrite(args.FILE, img)
+    if args.INIT != None:
+        img = cv2.imread(args.INIT, cv2.IMREAD_UNCHANGED)
+    else:
+        img = np.full((args.WIDTH, args.HEIGHT, 3), 255, dtype=elementType)
+
+    if args.METHOD == 'I':
+        testDropCircle(img, args.COUNT)
+    elif args.METHOD == 'T':
+        testDrawTineLine(img, args.COUNT)
+
+    # linearly stretches the image range for uint16 pallet
+    img_scaled = cv2.normalize(img, dst=None, alpha=0, beta=2**16 - 1, norm_type=cv2.NORM_MINMAX)
+    cv2.imwrite(args.FILE, img_scaled)
