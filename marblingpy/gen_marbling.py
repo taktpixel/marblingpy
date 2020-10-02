@@ -23,6 +23,7 @@ __date__ = "2020/10/01 21:06:31"
 __version__ = "$1.0$"
 __file__="GEN_MARBLING_PY"
 __credits__ = ""
+PACKAGE_NAME = 'marblingpy'
 
 import sys
 from datetime import datetime
@@ -30,21 +31,6 @@ import cv2
 import numpy as np
 import math
 import argparse
-
-parser = argparse.ArgumentParser(description='generate a randomized mathematical marbling image.')
-parser.add_argument('--init', dest='INIT', type=str, help='if given, the distortion will start based from the image (png) file', metavar='INIT')
-parser.add_argument('--save', dest='FILE', type=str, help='write generating image to FILE', metavar='FILE', default=datetime.now().strftime('%y%m%d%H%M%S.%f')[:-3] + '.png')
-parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function that applies to the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
-parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
-parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
-parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED')
-parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
-
-args = parser.parse_args()
-elementType = np.uint16
-
-# set seed
-np.random.seed(args.SEED)
 
 #
 # test functions
@@ -169,7 +155,23 @@ def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
                 print (e)
                 sys.exit(1)
 
-if __name__=='__main__':
+def main():
+    parser = argparse.ArgumentParser(prog=PACKAGE_NAME.replace('_', '-'), description='generate a randomized mathematical marbling image.')
+    parser.add_argument('--init', dest='INIT', type=str, help='if given, the distortion will start based from the image (png) file', metavar='INIT')
+    parser.add_argument('--save', dest='FILE', type=str, help='write generating image to FILE', metavar='FILE', default=datetime.now().strftime('%y%m%d%H%M%S.%f')[:-3] + '.png')
+    parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function that applies to the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
+    parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
+    parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
+    parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED')
+    parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
+
+    args = parser.parse_args()
+    elementType = np.uint16
+
+    # set seed
+    np.random.seed(args.SEED)
+
+    # processing
     if args.INIT != None:
         img = cv2.imread(args.INIT, cv2.IMREAD_UNCHANGED)
     else:
@@ -183,3 +185,6 @@ if __name__=='__main__':
     # linearly stretches the image range for uint16 pallet
     img_scaled = cv2.normalize(img, dst=None, alpha=0, beta=2**16 - 1, norm_type=cv2.NORM_MINMAX)
     cv2.imwrite(args.FILE, img_scaled)
+
+if __name__=='__main__':
+    main()
