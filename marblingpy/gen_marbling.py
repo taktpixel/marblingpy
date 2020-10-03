@@ -32,6 +32,8 @@ import numpy as np
 import math
 import argparse
 
+elementType = np.uint16
+
 #
 # test functions
 #
@@ -45,27 +47,27 @@ def testGetRandomIntDivision(n, div, divList = []):
 
     return testGetRandomIntDivision(n - s, div - 1, divList)
 
-def testDropCircle(img, count = 10):
+def testDropCircle(img, width, height, count = 10):
     for i in range(count):
         color1 = np.random.randint(0, 256)
         color2 = np.random.randint(0, 256)
         color3 = np.random.randint(0, 256)
-        x = np.random.randint(0, args.WIDTH)
-        y = np.random.randint(0, args.HEIGHT)
-        r = np.random.randint(10, np.min((100, np.max((10, int(np.min((args.WIDTH, args.HEIGHT))/2))))))
+        x = np.random.randint(0, width)
+        y = np.random.randint(0, height)
+        r = np.random.randint(10, np.min((100, np.max((10, int(np.min((width, height))/2))))))
 
         dropCircle(img, (color1, color2, color3), (x, y), r)
 
-def testDrawTineLine(img, count = 2):
+def testDrawTineLine(img, width, height, count = 2):
     for i in range(count):
-        dir1 = np.random.randint(0, args.WIDTH)
-        dir2 = np.random.randint(0, args.HEIGHT)
-        init1 = np.random.randint(0, args.WIDTH)
-        init2 = np.random.randint(0, args.HEIGHT)
-        shift = np.random.randint(0, args.HEIGHT * 2)
+        dir1 = np.random.randint(0, width)
+        dir2 = np.random.randint(0, height)
+        init1 = np.random.randint(0, width)
+        init2 = np.random.randint(0, height)
+        shift = np.random.randint(0, height * 2)
         sharpness = np.random.randint(0, 32)
 
-        drawTineLine(img, (dir1, dir2), (init1, init2), shift, sharpness)
+        drawTineLine(img, width, height, (dir1, dir2), (init1, init2), shift, sharpness)
 
 #
 # tool functions
@@ -108,7 +110,7 @@ def dropCircle(img, color, dpCoord, r):
 
     cv2.circle(img, (dpCoord[1], dpCoord[0]), r, _color, -1, lineType=cv2.LINE_AA)
 
-def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
+def drawTineLine(img, width, height, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
     # keep buf unchaged for reference
     buf = img.copy()
     for i, row in enumerate(buf):
@@ -139,12 +141,12 @@ def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
             # the originated point, thought of as warped into the current position, may sometimes become out the bound
             # of the pallet. So we need work-around to fill the gap of `no point to be warped from`.
             # Specular reflection method
-            if origCoordArray[0] > args.WIDTH - 1:
-                origCoordArray[0] = args.WIDTH - 1
+            if origCoordArray[0] > width - 1:
+                origCoordArray[0] = width - 1
             elif origCoordArray[0] < 0:
                 origCoordArray[0] = 0
-            if origCoordArray[1] > args.HEIGHT - 1:
-                origCoordArray[1] = args.HEIGHT - 1
+            if origCoordArray[1] > height - 1:
+                origCoordArray[1] = height - 1
             elif origCoordArray[1] < 0:
                 origCoordArray[1] = 0
 
@@ -156,20 +158,25 @@ def drawTineLine(img, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
                 sys.exit(1)
 
 def main():
+    NOW = datetime.now()
     parser = argparse.ArgumentParser(prog=PACKAGE_NAME.replace('_', '-'), description='generate a randomized mathematical marbling image.')
     parser.add_argument('--init', dest='INIT', type=str, help='if given, the distortion will start based from the image (png) file', metavar='INIT')
-    parser.add_argument('--save', dest='FILE', type=str, help='write generating image to FILE', metavar='FILE', default=datetime.now().strftime('%y%m%d%H%M%S.%f')[:-3] + '.png')
+    parser.add_argument('--save', dest='FILE', type=str, help='write generating image to FILE', metavar='FILE', default=NOW.strftime('%y%m%d%H%M%S.%f')[:-3] + '.png')
     parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function that applies to the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
     parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
     parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
-    parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED')
+    parser.add_argument('-v', dest='VERBOSE', action='store_true', help='show verbose message')
+    parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED', default=int(datetime.timestamp(NOW)))
     parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
 
     args = parser.parse_args()
-    elementType = np.uint16
 
     # set seed
     np.random.seed(args.SEED)
+
+    # show seed if verbose option is true
+    if args.VERBOSE:
+        print ('Current seed: %d' % args.SEED)
 
     # processing
     if args.INIT != None:
@@ -178,9 +185,9 @@ def main():
         img = np.full((args.WIDTH, args.HEIGHT, 3), 255, dtype=elementType)
 
     if args.METHOD == 'I':
-        testDropCircle(img, args.COUNT)
+        testDropCircle(img, args.WIDTH, args.HEIGHT, args.COUNT)
     elif args.METHOD == 'T':
-        testDrawTineLine(img, args.COUNT)
+        testDrawTineLine(img, args.WIDTH, args.HEIGHT, args.COUNT)
 
     # linearly stretches the image range for uint16 pallet
     img_scaled = cv2.normalize(img, dst=None, alpha=0, beta=2**16 - 1, norm_type=cv2.NORM_MINMAX)
