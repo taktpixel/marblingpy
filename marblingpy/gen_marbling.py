@@ -39,7 +39,8 @@ with open(os.path.join(os.path.dirname(__file__), '__init__.py')) as f:
     match = re.search(r'__version__\s+=\s+(.*)', f.read())
 __version__ = str(ast.literal_eval(match.group(1)))
 
-elementType = np.uint16
+ELEMENT_TYPE = np.uint16
+MIN_THRESHOLD = 1e-8
 
 #
 # test functions
@@ -54,16 +55,19 @@ def testGetRandomIntDivision(n, div, divList = []):
 
     return testGetRandomIntDivision(n - s, div - 1, divList)
 
-def testDropCircle(img, height, width, count = 10):
+def testDropCircle(img, height, width, count = 10, verbose = False):
     for i in range(count):
         color = np.random.randint(0, 256, 3)
         x = np.random.randint(0, width)
         y = np.random.randint(0, height)
         r = np.random.randint(10, np.min((100, np.max((10, int(np.min((width, height))/2))))))
 
+        if (verbose):
+            print('drop circle ({}/{}) : (x, y, r) = ({}, {}, {})'.format(i, count, x, y, r))
+
         dropCircle(img, color, (y, x), r)
 
-def testDrawTineLine(img, height, width, count = 2):
+def testDrawTineLine(img, height, width, count = 2, verbose = False):
     for i in range(count):
         dir1 = np.random.randint(1, height)
         dir2 = np.random.randint(1, width)
@@ -72,39 +76,51 @@ def testDrawTineLine(img, height, width, count = 2):
         shift = np.random.randint(0, np.min((width, height)) * 2)
         sharpness = np.random.randint(0, 32)
 
+        if (verbose):
+            print('tine line ({}/{}) : (x1, y1), (x2, y2), shift, sharpness = ({}, {}), ({}, {}), {}, {}' \
+                    .format(i, count, dir1, dir2, init1, init2, shift, sharpness))
+
         drawTineLine(img, height, width, (dir1, dir2), (init1, init2), shift, sharpness)
 
 #
 # tool functions
 #
+def range2dCoord(width, height):
+    """get range for 2D iteration
+
+    Args:
+        width (int): image width
+        height (int): image height
+
+    Returns:
+        2D array: shape is (width * height, 2)
+    """
+    baseArr = [[x for x in range(width)]] * height
+    xArr = np.stack(baseArr, axis=0).reshape((height * width,))
+    yArr = np.stack(baseArr, axis=1).reshape((height * width,))
+    sourceCoord = np.column_stack((xArr, yArr))
+    return sourceCoord
+
+
 def dropCircle(img, color, dpCoord, r):
-    # keep buf unchaged for reference
-    buf = img.copy()
+    dpCoord = np.array(dpCoord)
 
-    for i, row in enumerate(buf):
-        for j, col in enumerate(row):
-            # setup variables
-            dpCoordArray = np.array(dpCoord)
-            P = (i, j)
-            PArray = np.array(P)
+    # prepare source coordinate
+    h, w, _ = img.shape
+    sourceCoord = range2dCoord(w, h)
 
-            # calculate the derivative (difference) of vector [dp, p] (turns out to be `p - dp` for a point p in loop)
-            derivCoordArray = PArray - dpCoordArray
+    # generate pickup coordinate
+    derivCoordArray = sourceCoord - dpCoord
+    r_2 = r**2
+    dArray_2 = np.power(np.maximum(np.linalg.norm(derivCoordArray, axis=1), MIN_THRESHOLD), 2)
+    factorArray = np.sqrt(np.maximum(1.0 - r_2 / dArray_2, MIN_THRESHOLD))
+    pickupCoord = dpCoord + np.multiply(derivCoordArray, factorArray.reshape((1, -1)).T)
 
-            # calculate the distance between drop-point and the relevant point
-            d = np.linalg.norm(derivCoordArray)
+    # for nearest neighbor
+    pickupCoord = pickupCoord.astype(ELEMENT_TYPE)
 
-            # skip if the point is within the dropping area or it has never painted
-            if d < r:
-                continue
-            else:
-                origCoordArray = dpCoordArray + derivCoordArray * math.sqrt(1 - r**2 / d**2)
-                try:
-                    Q = tuple(elementType(origCoordArray))
-                    img[P] = buf[Q]
-                except Exception as e:
-                    print (e)
-                    sys.exit(1)
+    # copy spreading pixel by nearest neighbor
+    img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
 
     # cv2.circle method specifies the dropping point reverse the order (y, x)
     # instead of (x, y)
@@ -115,58 +131,48 @@ def dropCircle(img, color, dpCoord, r):
 
     cv2.circle(img, (dpCoord[1], dpCoord[0]), r, _color, -1, lineType=cv2.LINE_AA)
 
+
 def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
-    # keep buf unchaged for reference
-    buf = img.copy()
-    for i, row in enumerate(buf):
-        for j, col in enumerate(row):
-            # setup variables
-            initCoordArray = np.array(initCoord)
+    # setup variables
+    initCoordArray = np.array(initCoord)
 
-            ## dirVector must not be zero vector (i.e. !=(0,0) )
-            ## because the y-axis is inverted within the pixel coordinate, y-coordinate must be multiplied by -1.
-            dirVectorArray = np.array((dirVector[0], -dirVector[1]))
-            normOfDirVector = np.linalg.norm(dirVectorArray)
+    ## dirVector must not be zero vector (i.e. !=(0,0) )
+    ## because the y-axis is inverted within the pixel coordinate, y-coordinate must be multiplied by -1.
+    dirVectorArray = np.array((dirVector[0], -dirVector[1]))
+    normOfDirVector = np.linalg.norm(dirVectorArray)
 
-            if normOfDirVector == 0:
-                raise RuntimeError('"dirVector" must not be zero vector.')
+    if normOfDirVector == 0:
+        raise RuntimeError('"dirVector" must not be zero vector.')
 
-            dirVectorUnitArray = dirVectorArray / normOfDirVector
+    dirVectorUnitArray = dirVectorArray / normOfDirVector
 
-            ## the y-axis inversion makes the normal vector be equivalent of directional vector of the tine line,
-            ## if the orientation is compatible with given arguments, which suffices in this case.
-            NCoord = dirVector
-            NCoordArray = np.array(NCoord)
-            NCoordUnitArray = NCoordArray / np.linalg.norm(NCoordArray)
+    ## the y-axis inversion makes the normal vector be equivalent of directional vector of the tine line,
+    ## if the orientation is compatible with given arguments, which suffices in this case.
+    nCoordArray = np.array(dirVector)
+    nCoordUnitArray = nCoordArray / np.linalg.norm(nCoordArray)
 
-            P = (i, j)
-            PArray = np.array(P)
+    # prepare source coordinate
+    h, w, _ = img.shape
+    sourceCoord = range2dCoord(w, h)
 
-            # calculate the distance between a point and the tine line
-            # note how we calculate the norm of inner product
-            d = np.linalg.norm(((PArray - initCoordArray) * NCoordUnitArray).sum())
+    # calculate the distance between a point and the tine line
+    # note how we calculate the norm of inner product
+    sourceCoordSub = np.subtract(sourceCoord, initCoordArray.reshape(-1, 1).T)
+    nCoordUnitArrayMul = np.multiply(sourceCoordSub, nCoordUnitArray.reshape(-1, 1).T)
+    dArray = np.abs(nCoordUnitArrayMul.sum(axis=1))
+    dArray = np.maximum(dArray, MIN_THRESHOLD)
 
-            # calculate the reverse function in order to obtain the originated point to be applied the tool function.
-            origCoordArray = PArray - shift * sharpness / (d + sharpness) * dirVectorUnitArray
+    # calculate the reverse function in order to obtain the originated point to be applied the tool function.
+    reverseFactor = shift * sharpness / (dArray + sharpness)
+    pickupCoord = sourceCoord - np.multiply(reverseFactor.reshape(-1, 1), dirVectorUnitArray.reshape(-1 , 1).T)
 
-            # the originated point, thought of as warped into the current position, may sometimes become out the bound
-            # of the pallet. So we need work-around to fill the gap of `no point to be warped from`.
-            # Specular reflection method
-            if origCoordArray[0] > height - 1:
-                origCoordArray[0] = height - 1
-            elif origCoordArray[0] < 0:
-                origCoordArray[0] = 0
-            if origCoordArray[1] > width - 1:
-                origCoordArray[1] = width - 1
-            elif origCoordArray[1] < 0:
-                origCoordArray[1] = 0
+    # for nearest neighbor
+    pickupCoord = np.clip(pickupCoord, (0, 0), (width -1, height - 1))
+    pickupCoord = pickupCoord.astype(ELEMENT_TYPE)
 
-            try:
-                Q = tuple(elementType(origCoordArray))
-                img[P] = buf[Q]
-            except Exception as e:
-                print (e)
-                sys.exit(1)
+    # copy spreading pixel by nearest neighbor
+    img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
+
 
 def main():
     NOW = datetime.now()
@@ -177,7 +183,7 @@ def main():
     parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function that applies to the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
     parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
     parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
-    parser.add_argument('-v', dest='VERBOSE', action='store_true', help='show verbose message')
+    parser.add_argument('-v', '--verbose', dest='VERBOSE', action='store_true', help='show verbose message')
     parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED', default=int(datetime.timestamp(NOW)))
     parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
 
@@ -202,12 +208,12 @@ def main():
         # linearly shrink/stretches the image range for uint16 data pallet
         img = cv2.normalize(imgLoaded, dst=None, alpha=0, beta=np.max(orig2DShape) - 1, norm_type=cv2.NORM_MINMAX)
     else:
-        img = np.full((height, width, 3), 255, dtype=elementType)
+        img = np.full((height, width, 3), 255, dtype=ELEMENT_TYPE)
 
     if args.METHOD == 'I':
-        testDropCircle(img, height, width, args.COUNT)
+        testDropCircle(img, height, width, args.COUNT, verbose=args.VERBOSE)
     elif args.METHOD == 'T':
-        testDrawTineLine(img, height, width, args.COUNT)
+        testDrawTineLine(img, height, width, args.COUNT, verbose=args.VERBOSE)
 
     # linearly stretches the image range for uint16 display pallet
     img_scaled = cv2.normalize(img, dst=None, alpha=0, beta=2**16 - 1, norm_type=cv2.NORM_MINMAX)

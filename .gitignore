@@ -142,3 +142,6 @@ cython_debug/
 
 # temporarily working directory
 work/
+
+# for Visual Studio Code
+.vscode/
