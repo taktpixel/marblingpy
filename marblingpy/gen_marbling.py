@@ -77,14 +77,29 @@ def testDrawTineLine(img, height, width, count = 2):
 #
 # tool functions
 #
+def range2dCoord(width, height):
+    """get range for 2D iteration
+
+    Args:
+        width (int): image width
+        height (int): image height
+
+    Returns:
+        2D array: shape is (width * height, 2)
+    """
+    baseArr = [[x for x in range(width)]] * height
+    xArr = np.stack(baseArr, axis=0).reshape((height * width,))
+    yArr = np.stack(baseArr, axis=1).reshape((height * width,))
+    sourceCoord = np.column_stack((xArr, yArr))
+    return sourceCoord
+
+
 def dropCircle(img, color, dpCoord, r):
     dpCoord = np.array(dpCoord)
 
     # prepare source coordinate
     h, w, _ = img.shape
-    xArr = np.stack([[x for x in range(w)]] * h, axis=0).reshape((h * w,))
-    yArr = np.stack([[x for x in range(w)]] * h, axis=1).reshape((h * w,))
-    sourceCoord = np.column_stack((xArr, yArr))
+    sourceCoord = range2dCoord(w, h)
 
     # generate pickup coordinate
     derivCoordArray = sourceCoord - dpCoord
@@ -130,15 +145,14 @@ def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, 
 
     # prepare source coordinate
     h, w, _ = img.shape
-    xArr = np.stack([[x for x in range(w)]] * h, axis=0).reshape((h * w,))
-    yArr = np.stack([[x for x in range(w)]] * h, axis=1).reshape((h * w,))
-    sourceCoord = np.column_stack((xArr, yArr))
+    sourceCoord = range2dCoord(w, h)
 
     # calculate the distance between a point and the tine line
     # note how we calculate the norm of inner product
     sourceCoordSub = np.subtract(sourceCoord, initCoordArray.reshape(-1, 1).T)
     nCoordUnitArrayMul = np.multiply(sourceCoordSub, nCoordUnitArray.reshape(-1, 1).T)
     dArray = np.abs(nCoordUnitArrayMul.sum(axis=1))
+    dArray = np.maximum(dArray, 1e-8)
 
     # calculate the reverse function in order to obtain the originated point to be applied the tool function.
     reverseFactor = shift * sharpness / (dArray + sharpness)
