@@ -136,3 +136,12 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Mac OS
+.DS_Store
+
+# temporarily working directory
+work/
+
+# for Visual Studio Code
+.vscode/

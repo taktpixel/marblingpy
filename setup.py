@@ -9,6 +9,7 @@ from setuptools import setup, find_packages
 
 PACKAGE_NAME = 'marblingpy'
 SOURCE_DIR = 'marblingpy'
+MAIN_MODULE = 'gen_marbling'
 
 with open(os.path.join(SOURCE_DIR, '__init__.py')) as f:
     match = re.search(r'__version__\s+=\s+(.*)', f.read())
@@ -42,6 +43,6 @@ setup(
     },
     entry_points='''
         [console_scripts]
-        {app}=marblingpy.{pkg}:main
-    '''.format(app=PACKAGE_NAME.replace('_', '-'), pkg=PACKAGE_NAME),
+        {app}={src}.{main}:main
+    '''.format(app=PACKAGE_NAME.replace('_', '-'), pkg=PACKAGE_NAME, src=SOURCE_DIR, main=MAIN_MODULE),
 )
