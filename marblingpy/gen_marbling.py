@@ -77,38 +77,27 @@ def testDrawTineLine(img, height, width, count = 2):
 #
 # tool functions
 #
-def dropCircleToSpreadPixel(img, buf, dpCoord, r, p):
-    # setup variables
-    dpCoordArray = np.array(dpCoord)
-    PArray = np.array(p)
-
-    # calculate the derivative (difference) of vector [dp, p] (turns out to be `p - dp` for a point p in loop)
-    derivCoordArray = PArray - dpCoordArray
-
-    # calculate the distance between drop-point and the relevant point
-    d = np.linalg.norm(derivCoordArray)
-
-    # skip if the point is within the dropping area or it has never painted
-    if d < r:
-        return img[p]
-    else:
-        origCoordArray = dpCoordArray + derivCoordArray * math.sqrt(1 - r**2 / d**2)
-        try:
-            q = tuple(elementType(origCoordArray))
-            return buf[q]
-        except Exception as e:
-            print (e)
-            sys.exit(1)
-
-
 def dropCircle(img, color, dpCoord, r):
-    # keep buf unchaged for reference
-    buf = img.copy()
+    dpCoord = np.array(dpCoord)
 
-    for i, row in enumerate(buf):
-        for j, col in enumerate(row):
-            p = (i, j)
-            img[p] = dropCircleToSpreadPixel(img, buf, dpCoord, r, p)
+    # prepare coordinate
+    h, w, _ = img.shape
+    xArr = np.stack([[x for x in range(w)]] * h, axis=0).reshape((h * w,))
+    yArr = np.stack([[x for x in range(w)]] * h, axis=1).reshape((h * w,))
+    sourceCoord = np.column_stack((xArr, yArr))
+
+    # generate pickup coordinate
+    derivCoordArray = sourceCoord - dpCoord
+    r_2 = r**2
+    dArray_2 = np.power(np.maximum(np.linalg.norm(derivCoordArray, axis=1), 1e-8), 2)
+    factorArray = np.sqrt(np.maximum(1.0 - r_2 / dArray_2, 1e-8))
+    pickupCoord = dpCoord + np.multiply(derivCoordArray, factorArray.reshape((1, -1)).T)
+
+    # for nearest neighbor
+    pickupCoord = np.uint16(pickupCoord)
+
+    # copy spreading pixel by nearest neighbor
+    img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
 
     # cv2.circle method specifies the dropping point reverse the order (y, x)
     # instead of (x, y)
