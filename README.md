@@ -14,6 +14,7 @@ usage
 ```bash
 marblingpy [-h] [--init INIT] [--save FILE] -m M [-W W] [-H H] [--seed SEED] [--count C]
   -h, --help        show this help message and exit
+  --version         show program\'s version number and exit
   --init INIT       if given, the distortion will start based from the image (png) file
   --save FILE       write generating image to FILE
   -m M, --method M  the tool function that applies to the image; I=ink-drop, T=tine-line.
