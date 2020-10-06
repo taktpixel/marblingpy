@@ -18,19 +18,26 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-__author__ = "Shinobu Yokoyama <cohomolg@gmail.com>"
-__date__ = "2020/10/04 16:23:40"
-__version__ = "$1.0$"
-__file__="GEN_MARBLING_PY"
-__credits__ = ""
-PACKAGE_NAME = 'marblingpy'
-
+import os
+import ast
 import sys
 from datetime import datetime
+import math
+import re
+
 import cv2
 import numpy as np
-import math
 import argparse
+
+PACKAGE_NAME = 'marblingpy'
+
+__author__ = "Shinobu Yokoyama <cohomolg@gmail.com>"
+__date__ = "2020/10/04 16:23:40"
+# __file__="GEN_MARBLING_PY"
+__credits__ = ""
+with open(os.path.join(os.path.dirname(__file__), '__init__.py')) as f:
+    match = re.search(r'__version__\s+=\s+(.*)', f.read())
+__version__ = str(ast.literal_eval(match.group(1)))
 
 elementType = np.uint16
 
@@ -164,6 +171,7 @@ def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, 
 def main():
     NOW = datetime.now()
     parser = argparse.ArgumentParser(prog=PACKAGE_NAME.replace('_', '-'), description='generate a randomized mathematical marbling image.')
+    parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
     parser.add_argument('--init', dest='INIT', type=str, help='if given, the distortion will start based from the image (png) file', metavar='INIT')
     parser.add_argument('--save', dest='FILE', type=str, help='write generating image to FILE', metavar='FILE', default=NOW.strftime('%y%m%d%H%M%S.%f')[:-3] + '.png')
     parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function that applies to the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
