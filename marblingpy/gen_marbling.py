@@ -77,34 +77,38 @@ def testDrawTineLine(img, height, width, count = 2):
 #
 # tool functions
 #
+def dropCircleToSpreadPixel(img, buf, dpCoord, r, p):
+    # setup variables
+    dpCoordArray = np.array(dpCoord)
+    PArray = np.array(p)
+
+    # calculate the derivative (difference) of vector [dp, p] (turns out to be `p - dp` for a point p in loop)
+    derivCoordArray = PArray - dpCoordArray
+
+    # calculate the distance between drop-point and the relevant point
+    d = np.linalg.norm(derivCoordArray)
+
+    # skip if the point is within the dropping area or it has never painted
+    if d < r:
+        return img[p]
+    else:
+        origCoordArray = dpCoordArray + derivCoordArray * math.sqrt(1 - r**2 / d**2)
+        try:
+            q = tuple(elementType(origCoordArray))
+            return buf[q]
+        except Exception as e:
+            print (e)
+            sys.exit(1)
+
+
 def dropCircle(img, color, dpCoord, r):
     # keep buf unchaged for reference
     buf = img.copy()
 
     for i, row in enumerate(buf):
         for j, col in enumerate(row):
-            # setup variables
-            dpCoordArray = np.array(dpCoord)
-            P = (i, j)
-            PArray = np.array(P)
-
-            # calculate the derivative (difference) of vector [dp, p] (turns out to be `p - dp` for a point p in loop)
-            derivCoordArray = PArray - dpCoordArray
-
-            # calculate the distance between drop-point and the relevant point
-            d = np.linalg.norm(derivCoordArray)
-
-            # skip if the point is within the dropping area or it has never painted
-            if d < r:
-                continue
-            else:
-                origCoordArray = dpCoordArray + derivCoordArray * math.sqrt(1 - r**2 / d**2)
-                try:
-                    Q = tuple(elementType(origCoordArray))
-                    img[P] = buf[Q]
-                except Exception as e:
-                    print (e)
-                    sys.exit(1)
+            p = (i, j)
+            img[p] = dropCircleToSpreadPixel(img, buf, dpCoord, r, p)
 
     # cv2.circle method specifies the dropping point reverse the order (y, x)
     # instead of (x, y)
@@ -177,7 +181,7 @@ def main():
     parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function that applies to the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
     parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
     parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
-    parser.add_argument('-v', dest='VERBOSE', action='store_true', help='show verbose message')
+    parser.add_argument('-v', '--verbose', dest='VERBOSE', action='store_true', help='show verbose message')
     parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED', default=int(datetime.timestamp(NOW)))
     parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
 
