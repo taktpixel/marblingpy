@@ -39,7 +39,8 @@ with open(os.path.join(os.path.dirname(__file__), '__init__.py')) as f:
     match = re.search(r'__version__\s+=\s+(.*)', f.read())
 __version__ = str(ast.literal_eval(match.group(1)))
 
-elementType = np.uint16
+ELEMENT_TYPE = np.uint16
+MIN_THRESHOLD = 1e-8
 
 #
 # test functions
@@ -54,16 +55,19 @@ def testGetRandomIntDivision(n, div, divList = []):
 
     return testGetRandomIntDivision(n - s, div - 1, divList)
 
-def testDropCircle(img, height, width, count = 10):
+def testDropCircle(img, height, width, count = 10, verbose = False):
     for i in range(count):
         color = np.random.randint(0, 256, 3)
         x = np.random.randint(0, width)
         y = np.random.randint(0, height)
         r = np.random.randint(10, np.min((100, np.max((10, int(np.min((width, height))/2))))))
 
+        if (verbose):
+            print('drop circle ({}/{}) : (x, y, r) = ({}, {}, {})'.format(i, count, x, y, r))
+
         dropCircle(img, color, (y, x), r)
 
-def testDrawTineLine(img, height, width, count = 2):
+def testDrawTineLine(img, height, width, count = 2, verbose = False):
     for i in range(count):
         dir1 = np.random.randint(1, height)
         dir2 = np.random.randint(1, width)
@@ -71,6 +75,10 @@ def testDrawTineLine(img, height, width, count = 2):
         init2 = np.random.randint(0, width)
         shift = np.random.randint(0, np.min((width, height)) * 2)
         sharpness = np.random.randint(0, 32)
+
+        if (verbose):
+            print('tine line ({}/{}) : (x1, y1), (x2, y2), shift, sharpness = ({}, {}), ({}, {}), {}, {}' \
+                    .format(i, count, dir1, dir2, init1, init2, shift, sharpness))
 
         drawTineLine(img, height, width, (dir1, dir2), (init1, init2), shift, sharpness)
 
@@ -104,12 +112,12 @@ def dropCircle(img, color, dpCoord, r):
     # generate pickup coordinate
     derivCoordArray = sourceCoord - dpCoord
     r_2 = r**2
-    dArray_2 = np.power(np.maximum(np.linalg.norm(derivCoordArray, axis=1), 1e-8), 2)
-    factorArray = np.sqrt(np.maximum(1.0 - r_2 / dArray_2, 1e-8))
+    dArray_2 = np.power(np.maximum(np.linalg.norm(derivCoordArray, axis=1), MIN_THRESHOLD), 2)
+    factorArray = np.sqrt(np.maximum(1.0 - r_2 / dArray_2, MIN_THRESHOLD))
     pickupCoord = dpCoord + np.multiply(derivCoordArray, factorArray.reshape((1, -1)).T)
 
     # for nearest neighbor
-    pickupCoord = np.uint16(pickupCoord)
+    pickupCoord = pickupCoord.astype(ELEMENT_TYPE)
 
     # copy spreading pixel by nearest neighbor
     img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
@@ -152,7 +160,7 @@ def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, 
     sourceCoordSub = np.subtract(sourceCoord, initCoordArray.reshape(-1, 1).T)
     nCoordUnitArrayMul = np.multiply(sourceCoordSub, nCoordUnitArray.reshape(-1, 1).T)
     dArray = np.abs(nCoordUnitArrayMul.sum(axis=1))
-    dArray = np.maximum(dArray, 1e-8)
+    dArray = np.maximum(dArray, MIN_THRESHOLD)
 
     # calculate the reverse function in order to obtain the originated point to be applied the tool function.
     reverseFactor = shift * sharpness / (dArray + sharpness)
@@ -160,7 +168,7 @@ def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, 
 
     # for nearest neighbor
     pickupCoord = np.clip(pickupCoord, (0, 0), (width -1, height - 1))
-    pickupCoord = np.uint16(pickupCoord)
+    pickupCoord = pickupCoord.astype(ELEMENT_TYPE)
 
     # copy spreading pixel by nearest neighbor
     img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
@@ -200,12 +208,12 @@ def main():
         # linearly shrink/stretches the image range for uint16 data pallet
         img = cv2.normalize(imgLoaded, dst=None, alpha=0, beta=np.max(orig2DShape) - 1, norm_type=cv2.NORM_MINMAX)
     else:
-        img = np.full((height, width, 3), 255, dtype=elementType)
+        img = np.full((height, width, 3), 255, dtype=ELEMENT_TYPE)
 
     if args.METHOD == 'I':
-        testDropCircle(img, height, width, args.COUNT)
+        testDropCircle(img, height, width, args.COUNT, verbose=args.VERBOSE)
     elif args.METHOD == 'T':
-        testDrawTineLine(img, height, width, args.COUNT)
+        testDrawTineLine(img, height, width, args.COUNT, verbose=args.VERBOSE)
 
     # linearly stretches the image range for uint16 display pallet
     img_scaled = cv2.normalize(img, dst=None, alpha=0, beta=2**16 - 1, norm_type=cv2.NORM_MINMAX)
