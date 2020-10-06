@@ -80,7 +80,7 @@ def testDrawTineLine(img, height, width, count = 2):
 def dropCircle(img, color, dpCoord, r):
     dpCoord = np.array(dpCoord)
 
-    # prepare coordinate
+    # prepare source coordinate
     h, w, _ = img.shape
     xArr = np.stack([[x for x in range(w)]] * h, axis=0).reshape((h * w,))
     yArr = np.stack([[x for x in range(w)]] * h, axis=1).reshape((h * w,))
@@ -108,51 +108,54 @@ def dropCircle(img, color, dpCoord, r):
 
     cv2.circle(img, (dpCoord[1], dpCoord[0]), r, _color, -1, lineType=cv2.LINE_AA)
 
+def pickupPixelForTineLine(height, width, i, j, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
+    # setup variables
+    initCoordArray = np.array(initCoord)
+
+    ## dirVector must not be zero vector (i.e. !=(0,0) )
+    ## because the y-axis is inverted within the pixel coordinate, y-coordinate must be multiplied by -1.
+    dirVectorArray = np.array((dirVector[0], -dirVector[1]))
+    normOfDirVector = np.linalg.norm(dirVectorArray)
+
+    if normOfDirVector == 0:
+        raise RuntimeError('"dirVector" must not be zero vector.')
+
+    dirVectorUnitArray = dirVectorArray / normOfDirVector
+
+    ## the y-axis inversion makes the normal vector be equivalent of directional vector of the tine line,
+    ## if the orientation is compatible with given arguments, which suffices in this case.
+    nCoordArray = np.array(dirVector)
+    nCoordUnitArray = nCoordArray / np.linalg.norm(nCoordArray)
+
+    P = (i, j)
+    PArray = np.array(P)
+
+    # calculate the distance between a point and the tine line
+    # note how we calculate the norm of inner product
+    k = ((PArray - initCoordArray) * nCoordUnitArray)
+    ks = k.sum()
+    d = np.linalg.norm(ks)
+
+    # calculate the reverse function in order to obtain the originated point to be applied the tool function.
+    origCoordArray = PArray - shift * sharpness / (d + sharpness) * dirVectorUnitArray
+
+    # the originated point, thought of as warped into the current position, may sometimes become out the bound
+    # of the pallet. So we need work-around to fill the gap of `no point to be warped from`.
+    # Specular reflection method
+    origCoordArray[0] = np.clip(origCoordArray[0], 0, height - 1)
+    origCoordArray[1] = np.clip(origCoordArray[1], 0, width - 1)
+
+    return origCoordArray
+
+
 def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
     # keep buf unchaged for reference
     buf = img.copy()
     for i, row in enumerate(buf):
         for j, col in enumerate(row):
-            # setup variables
-            initCoordArray = np.array(initCoord)
-
-            ## dirVector must not be zero vector (i.e. !=(0,0) )
-            ## because the y-axis is inverted within the pixel coordinate, y-coordinate must be multiplied by -1.
-            dirVectorArray = np.array((dirVector[0], -dirVector[1]))
-            normOfDirVector = np.linalg.norm(dirVectorArray)
-
-            if normOfDirVector == 0:
-                raise RuntimeError('"dirVector" must not be zero vector.')
-
-            dirVectorUnitArray = dirVectorArray / normOfDirVector
-
-            ## the y-axis inversion makes the normal vector be equivalent of directional vector of the tine line,
-            ## if the orientation is compatible with given arguments, which suffices in this case.
-            NCoord = dirVector
-            NCoordArray = np.array(NCoord)
-            NCoordUnitArray = NCoordArray / np.linalg.norm(NCoordArray)
 
             P = (i, j)
-            PArray = np.array(P)
-
-            # calculate the distance between a point and the tine line
-            # note how we calculate the norm of inner product
-            d = np.linalg.norm(((PArray - initCoordArray) * NCoordUnitArray).sum())
-
-            # calculate the reverse function in order to obtain the originated point to be applied the tool function.
-            origCoordArray = PArray - shift * sharpness / (d + sharpness) * dirVectorUnitArray
-
-            # the originated point, thought of as warped into the current position, may sometimes become out the bound
-            # of the pallet. So we need work-around to fill the gap of `no point to be warped from`.
-            # Specular reflection method
-            if origCoordArray[0] > height - 1:
-                origCoordArray[0] = height - 1
-            elif origCoordArray[0] < 0:
-                origCoordArray[0] = 0
-            if origCoordArray[1] > width - 1:
-                origCoordArray[1] = width - 1
-            elif origCoordArray[1] < 0:
-                origCoordArray[1] = 0
+            origCoordArray = pickupPixelForTineLine(height, width, i, j, dirVector, initCoord, shift, sharpness)
 
             try:
                 Q = tuple(elementType(origCoordArray))
