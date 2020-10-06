@@ -108,7 +108,8 @@ def dropCircle(img, color, dpCoord, r):
 
     cv2.circle(img, (dpCoord[1], dpCoord[0]), r, _color, -1, lineType=cv2.LINE_AA)
 
-def pickupPixelForTineLine(height, width, i, j, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
+
+def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
     # setup variables
     initCoordArray = np.array(initCoord)
 
@@ -127,42 +128,29 @@ def pickupPixelForTineLine(height, width, i, j, dirVector, initCoord = (0, 0), s
     nCoordArray = np.array(dirVector)
     nCoordUnitArray = nCoordArray / np.linalg.norm(nCoordArray)
 
-    P = (i, j)
-    PArray = np.array(P)
+    # prepare source coordinate
+    h, w, _ = img.shape
+    xArr = np.stack([[x for x in range(w)]] * h, axis=0).reshape((h * w,))
+    yArr = np.stack([[x for x in range(w)]] * h, axis=1).reshape((h * w,))
+    sourceCoord = np.column_stack((xArr, yArr))
 
     # calculate the distance between a point and the tine line
     # note how we calculate the norm of inner product
-    k = ((PArray - initCoordArray) * nCoordUnitArray)
-    ks = k.sum()
-    d = np.linalg.norm(ks)
+    sourceCoordSub = np.subtract(sourceCoord, initCoordArray.reshape(-1, 1).T)
+    nCoordUnitArrayMul = np.multiply(sourceCoordSub, nCoordUnitArray.reshape(-1, 1).T)
+    dArray = np.abs(nCoordUnitArrayMul.sum(axis=1))
 
     # calculate the reverse function in order to obtain the originated point to be applied the tool function.
-    origCoordArray = PArray - shift * sharpness / (d + sharpness) * dirVectorUnitArray
+    reverseFactor = shift * sharpness / (dArray + sharpness)
+    pickupCoord = sourceCoord - np.multiply(reverseFactor.reshape(-1, 1), dirVectorUnitArray.reshape(-1 , 1).T)
 
-    # the originated point, thought of as warped into the current position, may sometimes become out the bound
-    # of the pallet. So we need work-around to fill the gap of `no point to be warped from`.
-    # Specular reflection method
-    origCoordArray[0] = np.clip(origCoordArray[0], 0, height - 1)
-    origCoordArray[1] = np.clip(origCoordArray[1], 0, width - 1)
+    # for nearest neighbor
+    pickupCoord = np.clip(pickupCoord, (0, 0), (width -1, height - 1))
+    pickupCoord = np.uint16(pickupCoord)
 
-    return origCoordArray
+    # copy spreading pixel by nearest neighbor
+    img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
 
-
-def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
-    # keep buf unchaged for reference
-    buf = img.copy()
-    for i, row in enumerate(buf):
-        for j, col in enumerate(row):
-
-            P = (i, j)
-            origCoordArray = pickupPixelForTineLine(height, width, i, j, dirVector, initCoord, shift, sharpness)
-
-            try:
-                Q = tuple(elementType(origCoordArray))
-                img[P] = buf[Q]
-            except Exception as e:
-                print (e)
-                sys.exit(1)
 
 def main():
     NOW = datetime.now()
