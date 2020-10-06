@@ -83,7 +83,7 @@ def testDrawTineLine(img, height, width, count = 2, interpolation = 'nearest', v
         drawTineLine(img, height, width, (dir1, dir2), (init1, init2), shift, sharpness, interpolation)
 
 #
-# tool functions
+# utilities
 #
 def range2dCoord(width, height):
     """get range for 2D iteration
@@ -102,6 +102,16 @@ def range2dCoord(width, height):
     return sourceCoord
 
 def bilinearInterpolation(img, x, y):
+    """pickup bilinear interpolated color
+
+    Args:
+        img (Mat): 3D, 3-channel color image
+        x (float): floating position coordinate
+        y (float): floating position coordinate
+
+    Returns:
+        value: color value
+    """
     x1 = np.floor(x).astype(ELEMENT_TYPE)
     x2 = x1 + 1
     xr = x - x1
@@ -109,28 +119,24 @@ def bilinearInterpolation(img, x, y):
     y2 = y1 + 1
     yr = y - y1
 
-    val = []
     channel = img.shape[2]
+    val = np.zeros((channel))
 
-    # slow !
+    xx = np.array([[1 - xr], [xr]], dtype='float32')
+    yy = np.array([[1 - yr], [yr]], dtype='float32')
+    f = np.array([[img[int(x1), int(y1), :], img[int(x1), int(y2), :]], [img[int(x2), int(y1), :], img[int(x2), int(y2), :]]])
+
     for i in range(channel):
-        xx = np.array([[1 - xr], [xr]], dtype='float32')
-        f = np.array([[img[int(x1), int(y1), i], img[int(x1), int(y2), i]], [img[int(x2), int(y1), i], img[int(x2), int(y2), i]]])
-        yy = np.array([[1 - yr], [yr]], dtype='float32')
-        b = np.matmul(f, yy)
+        b = np.matmul(f[:, :, i], yy)
         v = np.matmul(xx.T, b)
-        val.append(np.around(v).astype(ELEMENT_TYPE))
+        val[i] = v
 
-    # xx = np.array([[1 - xr], [xr]], dtype='float32')
-    # yy = np.array([[1 - yr], [yr]], dtype='float32')
-    # f = np.array([[img[int(x1), int(y1), :], img[int(x1), int(y2), :]], [img[int(x2), int(y1), :], img[int(x2), int(y2), :]]])
-    # for i in range(channel):
-    #     b = np.matmul(f[:, :, i], yy)
-    #     v = np.matmul(xx.T, b)
-    #     val.append(np.round(v).astype(ELEMENT_TYPE))
+    return np.around(np.array(val)).astype(ELEMENT_TYPE).reshape(channel)
 
-    return np.array(val).reshape(channel)
 
+#
+# tool functions
+#
 def dropCircle(img, color, dpCoord, r, interpolation = 'nearest'):
     dpCoord = np.array(dpCoord)
 
@@ -161,7 +167,6 @@ def dropCircle(img, color, dpCoord, r, interpolation = 'nearest'):
         for idx in range(len(sourceCoord)):
             p = sourceCoord[idx]
             q = pickupCoord[idx]
-            #img[p[0], p[1], :] = buf[q[0], q[1], :]
             img[p[0], p[1], :] = bilinearInterpolation(buf, q[0], q[1])
 
     # cv2.circle method specifies the dropping point reverse the order (y, x)
@@ -220,7 +225,6 @@ def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, 
         for idx in range(len(sourceCoord)):
             p = sourceCoord[idx]
             q = pickupCoord[idx]
-            #img[p[0], p[1], :] = buf[q[0], q[1], :]
             img[p[0], p[1], :] = bilinearInterpolation(buf, q[0], q[1])
 
 def main():
@@ -233,7 +237,7 @@ def main():
     parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
     parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
     parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED', default=int(datetime.timestamp(NOW)))
-    parser.add_argument('--interpolation', dest='INTERPOLATION', type=str, help='pixel filling interpolation type', metavar='INTERPOLATION', default='nearest', choices=['neareset', 'bilinear'])
+    parser.add_argument('--interpolation', dest='INTERPOLATION', type=str, help='pixel filling interpolation type', metavar='INTERPOLATION', default='nearest', choices=['nearest', 'bilinear'])
     parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
     parser.add_argument('-v', '--verbose', dest='VERBOSE', action='store_true', help='show verbose message')
 
