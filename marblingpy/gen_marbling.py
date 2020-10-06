@@ -55,7 +55,7 @@ def testGetRandomIntDivision(n, div, divList = []):
 
     return testGetRandomIntDivision(n - s, div - 1, divList)
 
-def testDropCircle(img, height, width, count = 10, verbose = False):
+def testDropCircle(img, height, width, count = 10, interpolation = 'nearest', verbose = False):
     for i in range(count):
         color = np.random.randint(0, 256, 3)
         x = np.random.randint(0, width)
@@ -65,9 +65,9 @@ def testDropCircle(img, height, width, count = 10, verbose = False):
         if (verbose):
             print('drop circle ({}/{}) : (x, y, r) = ({}, {}, {})'.format(i, count, x, y, r))
 
-        dropCircle(img, color, (y, x), r)
+        dropCircle(img, color, (y, x), r, interpolation)
 
-def testDrawTineLine(img, height, width, count = 2, verbose = False):
+def testDrawTineLine(img, height, width, count = 2, interpolation = 'nearest', verbose = False):
     for i in range(count):
         dir1 = np.random.randint(1, height)
         dir2 = np.random.randint(1, width)
@@ -80,7 +80,7 @@ def testDrawTineLine(img, height, width, count = 2, verbose = False):
             print('tine line ({}/{}) : (x1, y1), (x2, y2), shift, sharpness = ({}, {}), ({}, {}), {}, {}' \
                     .format(i, count, dir1, dir2, init1, init2, shift, sharpness))
 
-        drawTineLine(img, height, width, (dir1, dir2), (init1, init2), shift, sharpness)
+        drawTineLine(img, height, width, (dir1, dir2), (init1, init2), shift, sharpness, interpolation)
 
 #
 # tool functions
@@ -101,8 +101,37 @@ def range2dCoord(width, height):
     sourceCoord = np.column_stack((xArr, yArr))
     return sourceCoord
 
+def bilinearInterpolation(img, x, y):
+    x1 = np.floor(x).astype(ELEMENT_TYPE)
+    x2 = x1 + 1
+    xr = x - x1
+    y1 = np.floor(y).astype(ELEMENT_TYPE)
+    y2 = y1 + 1
+    yr = y - y1
 
-def dropCircle(img, color, dpCoord, r):
+    val = []
+    channel = img.shape[2]
+
+    # slow !
+    for i in range(channel):
+        xx = np.array([[1 - xr], [xr]], dtype='float32')
+        f = np.array([[img[int(x1), int(y1), i], img[int(x1), int(y2), i]], [img[int(x2), int(y1), i], img[int(x2), int(y2), i]]])
+        yy = np.array([[1 - yr], [yr]], dtype='float32')
+        b = np.matmul(f, yy)
+        v = np.matmul(xx.T, b)
+        val.append(np.around(v).astype(ELEMENT_TYPE))
+
+    # xx = np.array([[1 - xr], [xr]], dtype='float32')
+    # yy = np.array([[1 - yr], [yr]], dtype='float32')
+    # f = np.array([[img[int(x1), int(y1), :], img[int(x1), int(y2), :]], [img[int(x2), int(y1), :], img[int(x2), int(y2), :]]])
+    # for i in range(channel):
+    #     b = np.matmul(f[:, :, i], yy)
+    #     v = np.matmul(xx.T, b)
+    #     val.append(np.round(v).astype(ELEMENT_TYPE))
+
+    return np.array(val).reshape(channel)
+
+def dropCircle(img, color, dpCoord, r, interpolation = 'nearest'):
     dpCoord = np.array(dpCoord)
 
     # prepare source coordinate
@@ -112,15 +141,28 @@ def dropCircle(img, color, dpCoord, r):
     # generate pickup coordinate
     derivCoordArray = sourceCoord - dpCoord
     r_2 = r**2
-    dArray_2 = np.power(np.maximum(np.linalg.norm(derivCoordArray, axis=1), MIN_THRESHOLD), 2)
-    factorArray = np.sqrt(np.maximum(1.0 - r_2 / dArray_2, MIN_THRESHOLD))
+    dArray_2 = np.maximum(np.power(np.linalg.norm(derivCoordArray, axis=1), 2), MIN_THRESHOLD)
+    factorArray = np.sqrt(np.maximum((dArray_2 - r_2) / dArray_2, MIN_THRESHOLD))
     pickupCoord = dpCoord + np.multiply(derivCoordArray, factorArray.reshape((1, -1)).T)
 
-    # for nearest neighbor
-    pickupCoord = pickupCoord.astype(ELEMENT_TYPE)
+    # extract
+    outerIndex = np.where(dArray_2 > r_2)
+    sourceCoord = sourceCoord[outerIndex]
+    pickupCoord = pickupCoord[outerIndex]
 
-    # copy spreading pixel by nearest neighbor
-    img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
+    if interpolation == 'nearest':
+        # for nearest neighbor
+        pickupCoord = np.round(pickupCoord).astype(ELEMENT_TYPE)
+
+        # copy spreading pixel by nearest neighbor
+        img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
+    elif interpolation == 'bilinear':
+        buf = img.copy()
+        for idx in range(len(sourceCoord)):
+            p = sourceCoord[idx]
+            q = pickupCoord[idx]
+            #img[p[0], p[1], :] = buf[q[0], q[1], :]
+            img[p[0], p[1], :] = bilinearInterpolation(buf, q[0], q[1])
 
     # cv2.circle method specifies the dropping point reverse the order (y, x)
     # instead of (x, y)
@@ -132,7 +174,7 @@ def dropCircle(img, color, dpCoord, r):
     cv2.circle(img, (dpCoord[1], dpCoord[0]), r, _color, -1, lineType=cv2.LINE_AA)
 
 
-def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2):
+def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, sharpness = 2, interpolation = 'nearest'):
     # setup variables
     initCoordArray = np.array(initCoord)
 
@@ -165,14 +207,21 @@ def drawTineLine(img, height, width, dirVector, initCoord = (0, 0), shift = 10, 
     # calculate the reverse function in order to obtain the originated point to be applied the tool function.
     reverseFactor = shift * sharpness / (dArray + sharpness)
     pickupCoord = sourceCoord - np.multiply(reverseFactor.reshape(-1, 1), dirVectorUnitArray.reshape(-1 , 1).T)
-
-    # for nearest neighbor
     pickupCoord = np.clip(pickupCoord, (0, 0), (width -1, height - 1))
-    pickupCoord = pickupCoord.astype(ELEMENT_TYPE)
 
-    # copy spreading pixel by nearest neighbor
-    img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
+    if interpolation == 'nearest':
+        # for nearest neighbor
+        pickupCoord = np.round(pickupCoord).astype(ELEMENT_TYPE)
 
+        # copy spreading pixel by nearest neighbor
+        img[sourceCoord[:, 0], sourceCoord[:, 1], :] = img[pickupCoord[:, 0], pickupCoord[:, 1], :]
+    elif interpolation == 'bilinear':
+        buf = img.copy()
+        for idx in range(len(sourceCoord)):
+            p = sourceCoord[idx]
+            q = pickupCoord[idx]
+            #img[p[0], p[1], :] = buf[q[0], q[1], :]
+            img[p[0], p[1], :] = bilinearInterpolation(buf, q[0], q[1])
 
 def main():
     NOW = datetime.now()
@@ -183,9 +232,10 @@ def main():
     parser.add_argument('-m', '--method', dest='METHOD', type=str, help='the tool function that applies to the image; I=ink-drop, T=tine-line.', metavar='M', choices=['I', 'T'], required=True)
     parser.add_argument('-W', '--width', dest='WIDTH', type=int, help='the width in integer of generating image file (gif)', metavar='W', default=112)
     parser.add_argument('-H', '--height', dest='HEIGHT', type=int, help='the height in integer of generating image file (gif)', metavar='H', default=112)
-    parser.add_argument('-v', '--verbose', dest='VERBOSE', action='store_true', help='show verbose message')
     parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED', default=int(datetime.timestamp(NOW)))
+    parser.add_argument('--interpolation', dest='INTERPOLATION', type=str, help='pixel filling interpolation type', metavar='INTERPOLATION', default='nearest', choices=['neareset', 'bilinear'])
     parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
+    parser.add_argument('-v', '--verbose', dest='VERBOSE', action='store_true', help='show verbose message')
 
     args = parser.parse_args()
     width = args.WIDTH
@@ -211,9 +261,9 @@ def main():
         img = np.full((height, width, 3), 255, dtype=ELEMENT_TYPE)
 
     if args.METHOD == 'I':
-        testDropCircle(img, height, width, args.COUNT, verbose=args.VERBOSE)
+        testDropCircle(img, height, width, args.COUNT, interpolation=args.INTERPOLATION, verbose=args.VERBOSE)
     elif args.METHOD == 'T':
-        testDrawTineLine(img, height, width, args.COUNT, verbose=args.VERBOSE)
+        testDrawTineLine(img, height, width, args.COUNT, interpolation=args.INTERPOLATION, verbose=args.VERBOSE)
 
     # linearly stretches the image range for uint16 display pallet
     img_scaled = cv2.normalize(img, dst=None, alpha=0, beta=2**16 - 1, norm_type=cv2.NORM_MINMAX)
