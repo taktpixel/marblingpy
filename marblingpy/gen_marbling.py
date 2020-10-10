@@ -31,10 +31,6 @@ import argparse
 
 PACKAGE_NAME = 'marblingpy'
 
-__author__ = "Shinobu Yokoyama <cohomolg@gmail.com>"
-__date__ = "2020/10/04 16:23:40"
-# __file__="GEN_MARBLING_PY"
-__credits__ = ""
 with open(os.path.join(os.path.dirname(__file__), '__init__.py')) as f:
     match = re.search(r'__version__\s+=\s+(.*)', f.read())
 __version__ = str(ast.literal_eval(match.group(1)))
