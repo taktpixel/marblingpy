@@ -59,7 +59,13 @@ tine line (2/3) : (x1, y1), (x2, y2), shift, sharpness = (25, 23), (12, 127), 66
 
 ## Installation
 
-## pip
+## from pypi
+
+```bash
+pip install marblingpy
+```
+
+## from github
 
 ```bash
 pip install git+https://github.com/taktpixel/marblingpy

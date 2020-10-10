@@ -15,6 +15,10 @@ with open(os.path.join(SOURCE_DIR, '__init__.py')) as f:
     match = re.search(r'__version__\s+=\s+(.*)', f.read())
 version = str(ast.literal_eval(match.group(1)))
 
+this_directory = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
 def parse_requirements(filename):
     """ load requirements from a pip requirements file """
     lineiter = (line.strip() for line in open(filename))
@@ -26,9 +30,11 @@ setup(
     name=PACKAGE_NAME,
     version=version,
     description="generate a randomized mathematical marbling image",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     author="Taktpixel Co., Ltd.",
     author_email="contact@taktpixel.co.jp",
-    url="https://taktpixel.co.jp",
+    url="https://github.com/taktpixel/marblingpy",
 
     # options
     packages=find_packages(),
