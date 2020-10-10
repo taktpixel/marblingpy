@@ -1,8 +1,6 @@
 # marblingpy
 
-## Description
-
-generate a randomized mathematical marbling image.
+Python command-line application to generate a randomized mathematical marbling image.
 
 ![logo.png](logo.png "logo.png")
 
@@ -68,10 +66,20 @@ pip install git+https://github.com/taktpixel/marblingpy
 ```
 
 ### for development
+
+Clone this repository.
 ```
-git clone https://github.com/taktpixel/marblingpy.git
-cd marblingpy
+git clone git@github.com:taktpixel/marblingpy.git
+```
+
+For real time updating to pip command,
+```
 pip install -e .
+```
+
+To run python command.
+```
+python marblingpy/gen_marbling.py -h
 ```
 
 # Note
