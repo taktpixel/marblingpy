@@ -51,12 +51,13 @@ def testGetRandomIntDivision(n, div, divList = []):
 
     return testGetRandomIntDivision(n - s, div - 1, divList)
 
-def testDropCircle(img, height, width, count = 10, interpolation = 'nearest', verbose = False):
+def testDropCircle(img, height, width, count = 10, interpolation = 'nearest', min_size = 10, max_size = 2000, verbose = False):
     for i in range(count):
         color = np.random.randint(0, 256, 3)
         x = np.random.randint(0, width)
         y = np.random.randint(0, height)
-        r = np.random.randint(10, np.min((100, np.max((10, int(np.min((width, height))/2))))))
+        r_max = np.min((max_size, np.max((10, int(np.min((width, height))/2)))))
+        r = np.random.randint(min_size, r_max)
 
         if (verbose):
             print('drop circle ({}/{}) : (x, y, r) = ({}, {}, {})'.format(i, count, x, y, r))
@@ -235,6 +236,8 @@ def main():
     parser.add_argument('--seed', dest='SEED', type=np.uint32, help='input of an unsigned integer 0 or 2^32-1 to the algorithm that generates pseudo-random numbers throughout the program. the same seed produces the same result.', metavar='SEED', default=int(datetime.timestamp(NOW)))
     parser.add_argument('--interpolation', dest='INTERPOLATION', type=str, help='pixel filling interpolation type', metavar='INTERPOLATION', default='nearest', choices=['nearest', 'bilinear'])
     parser.add_argument('--count', dest='COUNT', type=int, help='the total number of times that tool functions shall be applied to render an image', metavar='C', default=1)
+    parser.add_argument('--size-min', dest='SIZEMIN', type=int, help='minimum size of the marbling drop circle', default=10)
+    parser.add_argument('--size-max', dest='SIZEMAX', type=int, help='minimum size of the marbling drop circle', default=1000)
     parser.add_argument('-v', '--verbose', dest='VERBOSE', action='store_true', help='show verbose message')
 
     args = parser.parse_args()
@@ -261,7 +264,7 @@ def main():
         img = np.full((height, width, 3), 255, dtype=ELEMENT_TYPE)
 
     if args.METHOD == 'I':
-        testDropCircle(img, height, width, args.COUNT, interpolation=args.INTERPOLATION, verbose=args.VERBOSE)
+        testDropCircle(img, height, width, args.COUNT, interpolation=args.INTERPOLATION, min_size=args.SIZEMIN, max_size=args.SIZEMAX, verbose=args.VERBOSE)
     elif args.METHOD == 'T':
         testDrawTineLine(img, height, width, args.COUNT, interpolation=args.INTERPOLATION, verbose=args.VERBOSE)
 
